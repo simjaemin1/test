@@ -4,7 +4,7 @@
 ## 0. How to build kernel
 
 ## 1. High Level Implementation
-### 1.3 Systemcall : long set_rotation(int degree);
+### 1.1 Systemcall : long set_rotation(int degree);
 * include/linux/syscalls.h
     가장 아래에 다음을 추가한다.  
     `asmlinkage long sys_set_rotation(int degree);`  
@@ -15,7 +15,7 @@
     `#define __NR_compat_syscalls   399`  
     로 수정한다.  
 * arch/arm64/include/asm/unistd32.h
-    아래 두 줄을 추가한다.
+    아래 두 줄을 추가한다.  
     `#define __NR_set_rotation 398`  
     `__SYSCALL(__NR_set_rotation, sys_set_rotation)`  
 
