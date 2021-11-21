@@ -63,6 +63,9 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
         return -ENOMEM;
     }
 
+    mutex_lock(&rotlock_mutex);
+    mutex_unlock(&rotlock_mutex);
+
     return -1;
 }
 
@@ -87,13 +90,17 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
         printk(KERN_ERR "kmalloc failed\n");
         return -ENOMEM;
     }
+
+    mutex_lock(&rotlock_mutex);
+    mutex_unlock(&rotlock_mutex);
+
     return -1;
 }
 
 SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 {
     rotlock_t *rotlock;
-    int cnt;
+    int result;
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
@@ -105,7 +112,11 @@ SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
         return -EINVAL;
     }
 
-    //rotlock = init_rotlock(degree, range, READ);
+    mutex_lock(&rotlock_mutex);
+
+    //rotlock = find_node(degree, range, &
+
+    mutex_unlock(&rotlock_mutex);
 
     return -1;
 }
@@ -113,7 +124,7 @@ SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
 {
     rotlock_t *rotlock;
-    int cnt;
+    int result;
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
@@ -125,7 +136,11 @@ SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
         return -EINVAL;
     }
 
-    //rotlock = init_rotlock(degree, range, WRITE);
+    mutex_lock(&rotlock_mutex);
+
+    
+
+    mutex_unlock(&rotlock_mutex);
 
     return -1;
 }
