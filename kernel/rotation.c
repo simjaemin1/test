@@ -190,20 +190,30 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 
     if(!rotlock) {
         printk(KERN_ERR "kmalloc failed\n");
-        return -ENOMEM;
+        return -1;
     }
 
     mutex_lock(&rotlock_mutex);
 
-    if(check_range(rotation, degree, range)) {
 
+    if(check_range(rotation, degree, range) 
+            && write_waiting_cnt[rotation] == 0 && list_empty(&write_acquired)) {
+        list_add(&rotlock->node, &read_acquired);
+        mutex_unlock(&rotlock_mutex);
+        return 0;
     }
     else {
-        list_add(&rotlock->node, &read_waiting);
-        wait();
-        
+        //list_add(&rotlock_node, &read_waiting);
+        while(!check_range(rotation, degree, range) 
+                || write_waiting_cnt[rotation] != 0 || !list_empty(&write_acquired)) {
+            list_add(&rotlock_node, &read_waiting);
+            mutex_unlock(&rotlock_mutex);
+            wait();
+            mutex_lock(&rotlock_mutex);
+        }
+        mutex_unlock(&rotlock_mutex);
+        return 0;
     }
-    mutex_unlock(&rotlock_mutex);
 
     return -1;
 }
@@ -230,9 +240,7 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
         return -ENOMEM;
     }
 
-    mutex_lock(&rotlock_mutex);
-
-    
+    mutex_lock(&rotlock_mutex);    
 
     mutex_unlock(&rotlock_mutex);
 
