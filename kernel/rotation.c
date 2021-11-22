@@ -57,7 +57,9 @@ void exit_rotlock(task_struct *p) // Inject this function into do_exit() in kern
     if(list_empty(&write_acquired)) {
         // list_empty(&write_acquired) means there are only reading rotlocks.
         list_for_each_entry_safe(curr, next, &read_acquied, node) {
-            list_del(&curr->node);
+            if(curr->pid == pid) {
+                list_del(&curr->node);
+            }
         }
 
         if(list_empty(&read_acquired)) {
@@ -93,21 +95,24 @@ rotlock_t* init_rotlock(int degree, int range, int rw_type)
     return rotlock;
 }
 
-rotlock_t* find_lock(int degree, int range, struct list_head* head)
+int find_node_and_del(int degree, int range, struct list_head* head)
 {
     // Don't need to get rotlock_mutex (Already locked)
     // How about identical multiple mutex? (multiple same degree, same range, same pid rotlock_t)
     rotlock_t* curr;
+    rotlock_t* next;
+    int cnt = 0;
 
-    list_for_each_entry(curr, head, node) {
+    list_for_each_entry_safe(curr, next, head, node) {
         if(curr->pid == current->pid &&
                 curr->degree == degree && curr->range == range) {
             list_del(&curr->node);
-            return rotlock;
+            cnt++;
+            kfree(curr);
         }
     }
     
-    return NULL; // Searching failed
+    return cnt; // Searching failed
 }
 
 SYSCALL_DEFINE1(set_rotation, int, degree)
@@ -122,6 +127,15 @@ SYSCALL_DEFINE1(set_rotation, int, degree)
 
     cnt = 0;
     rotation = degree;
+
+    if(list_empty(&write_acquired)) {
+        // Reading
+
+
+    }
+    else if(list_empty(&write_acquired)) {
+        // Writing
+    }
 
     list_for_each_entry_safe() {
         check_range();
@@ -196,8 +210,7 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
 
 SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 {
-    rotlock_t *rotlock;
-    int result;
+    int cnt;
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
@@ -211,24 +224,25 @@ SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 
     mutex_lock(&rotlock_mutex);
 
-    rotlock = find_node(degree, range, &read_acquired);
+    cnt = find_node_and_del(degree, range, &read_acquired);
     
-    if(!rotlock) {
+    if(!cnt) {
         mutex_unlock(&rotlock_mutex);
         printk(KERN_ERR "Can't find acquired read lock with degree %d and range %d\n", degree, range);
-        return -1;
+        return -1; // fail
+    }
+
+    if(list_empty(&read_acquired)) {
+        get_lock();
     }
 
     mutex_unlock(&rotlock_mutex);
-
-    kfree(rotlock);
-    return -1;
+    return 0; // success
 }
 
 SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
 {
-    rotlock_t *rotlock;
-    int result;
+    int cnt;
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
@@ -242,16 +256,16 @@ SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
 
     mutex_lock(&rotlock_mutex);
 
-    rotlock = find_node(degree, range, &write_acquired);
+    cnt = find_node_and_del(degree, range, &write_acquired);
 
-    if(!rotlock) {
+    if(!cnt) {
         mutex_unlock(&rotlock_mutex);
         printk(KERN_ERR "Can't find acquired write lock with degree %d and range %d\n", degree, range);
-        return -1;
+        return -1; // fail
     }
 
-    mutex_unlock(&rotlock_mutex);
+    get_lock();
 
-    kfree(rotlock);
-    return -1;
+    mutex_unlock(&rotlock_mutex);
+    return 0; // success
 }

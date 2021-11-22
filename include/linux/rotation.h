@@ -16,6 +16,6 @@ struct __rotlock_t__ {
 } rotlock_t
 
 rotlock_t* init_rotlock(int degree, int range, int rw_type);
-rotlock_t* find_lock(int degree, int range, struct list_head* head);
+rotlock_t* find_node_and_del(int degree, int range, struct list_head* head);
 void exit_rotlock(task_struct *p);
 #endif
