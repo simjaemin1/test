@@ -13,7 +13,13 @@ static LIST_HEAD(write_waiting);
 static LIST_HEAD(read_acquired);
 static LIST_HEAD(write_acquired);
 
-static DEFINE_MUTEX(rotlock_mutex);
+static DEFINE_MUTEX(rotlock_mutex); // need more mutex or not?
+
+void exit_rotlock(task_struct *p) // Inject this function into do_exit() in kernel/exit.c
+{
+    pid_t pid = p->pid;
+
+}
 
 rotlock_t* init_rotlock(int degree, int range, int rw_type) 
 {
@@ -32,29 +38,48 @@ rotlock_t* init_rotlock(int degree, int range, int rw_type)
 
 rotlock_t* find_lock(int degree, int range, struct list_head* head)
 {
-    struct list_head* pos;
-    rotlock_t* rotlock;
-    list_for_each(pos, head) {
+    //struct list_head* pos;
+    rotlock_t* curr;
+    //rotlock_t* next;
+    /*list_for_each(pos, head) { // list_for_each_entry_safe()?
         rotlock = container_of(pos, rotlock_t, node);
         if(rotlock->pid == current->pid && 
                 rotlock->degree == degree && rotlock->range == range)
             return rotlock;
     }
-    
-    if(pos == head) {
-        return NULL;
+
+    list_for_each_entry_safe(curr, next, head, node) {
+        if(curr->pid == current->pid &&
+                curr->degree == degree && curr->range == range) {
+            list_del(&curr->node); // ??
+            return rotlock;
+        }
+    }*/
+
+    list_for_each_entry(curr, head, node) {
+        if(curr->pid == current->pid &&
+                curr->degree == degree && curr->range == range) {
+            list_del(&curr->node);
+            return rotlock;
+        }
     }
-    return NULL;
+    
+    return NULL; // Searching failed
 }
 
 SYSCALL_DEFINE1(set_rotation, int, degree)
 {
+    int cnt;
+
     if(degree < 0 || degree >= 360) {
         printk(KERN_ERR "Degree argument should be between 0 and 360\n");
-        return -EINVAL;
+        return -1;
     }
 
+    cnt = 0;
     rotation = degree;
+
+    return cnt;
 }
 
 // We should check the condition degree - range <= LOCK RANGE <= degree + range
@@ -82,6 +107,9 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
     }
 
     mutex_lock(&rotlock_mutex);
+
+    
+
     mutex_unlock(&rotlock_mutex);
 
     return -1;
@@ -110,6 +138,9 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
     }
 
     mutex_lock(&rotlock_mutex);
+
+    
+
     mutex_unlock(&rotlock_mutex);
 
     return -1;
