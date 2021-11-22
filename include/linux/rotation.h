@@ -15,4 +15,7 @@ struct __rotlock_t__ {
     struct list_head node;
 } rotlock_t
 
+rotlock_t* init_rotlock(int degree, int range, int rw_type);
+rotlock_t* find_lock(int degree, int range, struct list_head* head);
+
 #endif
