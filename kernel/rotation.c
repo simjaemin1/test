@@ -178,12 +178,12 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 
     if(degree < 0 || degree >= 360) {
         printk(KERN_ERR "degree should be 0 <= degree < 360\n");
-        return -EINVAL;
+        return -1;
     }
 
     if(range <= 0 || range >= 180) {
         printk(KERN_ERR "range should be 0 < range < 180\n");
-        return -EINVAL;
+        return -1;
     }
 
     rotlock = init_rotlock(degree, range, READ);
@@ -195,8 +195,14 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 
     mutex_lock(&rotlock_mutex);
 
-    
+    if(check_range(rotation, degree, range)) {
 
+    }
+    else {
+        list_add(&rotlock->node, &read_waiting);
+        wait();
+        
+    }
     mutex_unlock(&rotlock_mutex);
 
     return -1;

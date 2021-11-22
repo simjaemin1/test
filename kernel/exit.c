@@ -68,6 +68,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+extern void exit_rotlock(task_struct *p);
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -764,6 +766,8 @@ void __noreturn do_exit(long code)
 {
 	struct task_struct *tsk = current;
 	int group_dead;
+
+    exit_rotlock(tsk);
 
 	profile_task_exit(tsk);
 	kcov_task_exit(tsk);
