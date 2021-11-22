@@ -19,6 +19,42 @@ static LIST_HEAD(write_acquired);
 
 static DEFINE_MUTEX(rotlock_mutex);
 
+int get_lock() {
+    // This should be called when read_acquired and write_acquired are all empty.
+    
+    rotlock_t *curr;
+    rotlock_t *next;
+    int cnt = 0;
+
+    mutex_lock(&rotlock_mutex);
+
+    if(write_waiting_cnt[rotation] != 0) {
+        list_for_each_entry(curr, &write_waiting, node) {
+            if(check_range(rotation, curr->degree, curr->range)) {
+                cnt++;
+                list_del(&curr->node, &write_waiting);
+                list_add_tail(&curr->node, &write_acquired);
+                modify_waiting_cnt(curr->degree, curr->range, DECREMENT);
+                wake_up();
+                break;
+            }
+        }
+    }
+    else {
+        list_for_each_entry_safe(curr, next, &read_waiting, node) {
+            if(check_range(rotation, curr->degree, curr->range)) {
+                cnt++;
+                list_del(&curr->node, &read_waiting);
+                list_add_tail(&curr->node, &read_acquired);
+                wake_up();
+            }
+        }
+    }
+    mutex_unlock(&rotlock_mutex);
+
+    return cnt;
+}
+
 int check_range(int rotation, int degree, int range)
 {
     int low = degree-range;
@@ -147,7 +183,7 @@ SYSCALL_DEFINE1(set_rotation, int, degree)
         list_for_each_entry_safe(curr, next, &read_acquired, node) {
             if(!check_range(rotation, curr->degree, curr->range)) {
                 list_del(&curr->node);
-                list_add(&curr->node, &read_waiting);
+                list_add_tail(&curr->node, &read_waiting);
                 wait(); //
             }
         }
@@ -157,7 +193,7 @@ SYSCALL_DEFINE1(set_rotation, int, degree)
         curr = list_first_entry(&write_acquired, rotlock_t, node);
         if(!check_range(rotation, curr->degree, curr->range)) {
             list_del(&curr->node);
-            list_add(&curr->node, &write_waiting);
+            list_add_tail(&curr->node, &write_waiting);
             wait();
         }
     }
@@ -198,7 +234,7 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 
     if(check_range(rotation, degree, range) 
             && write_waiting_cnt[rotation] == 0 && list_empty(&write_acquired)) {
-        list_add(&rotlock->node, &read_acquired);
+        list_add_tail(&rotlock->node, head);
         mutex_unlock(&rotlock_mutex);
         return 0;
     }
@@ -206,16 +242,16 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
         //list_add(&rotlock_node, &read_waiting);
         while(!check_range(rotation, degree, range) 
                 || write_waiting_cnt[rotation] != 0 || !list_empty(&write_acquired)) {
-            list_add(&rotlock_node, &read_waiting);
+            list_add_tail(&rotlock->node, &read_waiting);
             mutex_unlock(&rotlock_mutex);
             wait();
             mutex_lock(&rotlock_mutex);
         }
-        mutex_unlock(&rotlock_mutex);
-        return 0;
     }
 
-    return -1;
+    mutex_unlock(&rotlock_mutex);
+
+    return 0;
 }
 
 SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
@@ -242,9 +278,24 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
 
     mutex_lock(&rotlock_mutex);    
 
+    if(check_range(rotation, degree, range) && list_empty(&read_acquired)) {
+        list_add_tail(&rotlock->node, &write_acquired);
+        mutex_unlock(&rotlock_mutex);
+        return 0;
+    }
+    else {
+        while(!check_range(rotation, degree, range) || !list_empty(&read_acquired)) {
+            list_add_tail(&rotlock->node, &write_waiting);
+            modify_waiting_cnt(degree, range, INCREMENT);
+            mutex_unlock(&rotlock_mutex);
+            wait();
+            mutex_lock(&rotlock_mutex);
+        }
+    }
+
     mutex_unlock(&rotlock_mutex);
 
-    return -1;
+    return 0;
 }
 
 SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
