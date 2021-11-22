@@ -19,6 +19,18 @@ static LIST_HEAD(write_acquired);
 
 static DEFINE_MUTEX(rotlock_mutex);
 
+int check_range(int rotation, int degree, int range)
+{
+    int low = degree-range;
+    int high = degree+range;
+    if(low<0)
+        return (low+360<=rotation&&rotation<360)||(rotation<=high);
+    if(high>=360)
+        return (low<=rotation)||(rotation<=high-360);
+    return (low<=rotation)&&(rotation<=high);
+
+}
+
 void modify_waiting_cnt(int degree, int range, int type)
 {
     int pos=degree-range;
@@ -117,29 +129,42 @@ int find_node_and_del(int degree, int range, struct list_head* head)
 
 SYSCALL_DEFINE1(set_rotation, int, degree)
 {
-    int cnt;
-    rotlock_t *rotlock;
+    rotlock_t *curr;
+    rotlock_t *next;
+    int cnt = 0;
 
     if(degree < 0 || degree >= 360) {
         printk(KERN_ERR "Degree argument should be between 0 and 360\n");
         return -1;
     }
 
-    cnt = 0;
+    mutex_lock(&rotlock_mutex);
+
     rotation = degree;
 
     if(list_empty(&write_acquired)) {
         // Reading
-
-
+        list_for_each_entry_safe(curr, next, &read_acquired, node) {
+            if(!check_range(rotation, curr->degree, curr->range)) {
+                list_del(&curr->node);
+                list_add(&curr->node, &read_waiting);
+                wait(); //
+            }
+        }
     }
     else if(list_empty(&write_acquired)) {
         // Writing
+        curr = list_first_entry(&write_acquired, rotlock_t, node);
+        if(!check_range(rotation, curr->degree, curr->range)) {
+            list_del(&curr->node);
+            list_add(&curr->node, &write_waiting);
+            wait();
+        }
     }
 
-    list_for_each_entry_safe() {
-        check_range();
-    }
+    cnt = get_lock();
+
+    mutex_unlock(&rotlock_mutex);
 
     return cnt;
 }
