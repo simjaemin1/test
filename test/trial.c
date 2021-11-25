@@ -9,7 +9,7 @@
 
 void prime_factor(int num) {
 	printf("%d =  ", num);
-	in i =2;
+	int i =2;
 	while(i<num) {
 		if(num%i)
 			i++;
@@ -23,8 +23,10 @@ void prime_factor(int num) {
 
 
 int main(int argc, char *argv[]){
-	int num=0;
+	int num;
 	int identifier;
+    FILE *fp;
+    num = 0;
 	if(argc!=2)
 	{
 		printf("error: use only one argument\n");
@@ -43,8 +45,8 @@ int main(int argc, char *argv[]){
 		fscanf(fp, "%d", &num);
 		printf("trial-%d : ", identifier);
 		prime_factor(num);
-		fclose(fp)
-		syscall(ROUTUNLOCK_READ, 90, 90);
+		fclose(fp);
+		syscall(ROTUNLOCK_READ, 90, 90);
 	}
 }
 

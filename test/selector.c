@@ -9,6 +9,7 @@
 
 int main(int argc, char *argv[]){
 	int num;
+    FILE* fp;
 
 	if(argc!=2)
 	{
