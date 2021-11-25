@@ -18,26 +18,26 @@ static LIST_HEAD(read_acquired);
 static LIST_HEAD(write_acquired);
 
 static DEFINE_MUTEX(rotlock_mutex);
-static DECLARE_WAIT_QUEUE_HEAD(lock_wait_queue);
+static DECLARE_WAIT_QUEUE_HEAD(wait_queue);
 
 // static int cnt = 0;
 void wait(rotlock_t * curr)
 {
-	curr->condition=0;
+	curr->cond = 0;
 	DEFINE_WAIT(wait_entry);
 	add_wait_queue(&wait_queue, &wait_entry);
-	while(!curr>condition) {
-		prepare_to_wait(&wait_queue, &wait,	TASK_INTERRUPIBLE);
+	while(!curr->cond) {
+		prepare_to_wait(&wait_queue, &wait_entry, TASK_INTERRUPTIBLE);
 		schedule();
 	}
-	finish_wait(&q, &wait);
+	finish_wait(&wait_queue, &wait_entry);
 
 }
 
 void wakeup(rotlock_t * curr)
 {
-	curr->condition=1;
-	wake_up_task(find_process_by_pid(curr->pid));
+	curr->cond = 1;
+	wake_up_process(find_task_by_vpid(curr->pid));
 }
 
 int get_lock(void) {
