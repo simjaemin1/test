@@ -15,7 +15,7 @@ tizen-kernel
 cd tizen-kernel/tizen-5.0-rpi3
 git pull origin proj3
 sudo sh coompile.sh
-sudo sh ./qume.sh
+sudo sh ./qemu.sh
 ```
 
 ## 1. High Level Implementation
@@ -115,13 +115,14 @@ unlock 함수가 call된 경우에 해당 degree, range, list (read 또는 write
 
 ====> 수정 + 빈 경우에 get_lock하는것(unlock에서 알아서 부른다) 다른 함수에서도 (exit_rotlock등도 kfree 필요한듯?)
 #### 1.3.8 wait(rotlock_t *curr)
+wait_entry를 만들고 이를 wait_queue 에 넣는다. 그리고 prepare_to_wait을 호출하여 현재의 process의 상태를 TASK_INTERRUPTIBLE로 바꾼다. 이후 schedule()을 호출하여 현재 process를 runqueue에서 제거한다.
 #### 1.3.9 wakeup(rotlock_t *curr)
+condition value를 1로 만들고 wake_up_procdss를 호출하여 프로세스를 깨운다.
 
-
-#### 1.3.8 long set_rotation(int degree)
-#### 1.3.9 long rotlock_read(int degree, int range)
-#### 1.3.10 long rotlock_write(int degree, int range)
-#### 1.3.11 long rotunlock_read(int degree, int range)
+#### 1.3.9 long set_rotation(int degree)
+#### 1.3.10 long rotlock_read(int degree, int range)
+#### 1.3.11 long rotlock_write(int degree, int range)
+#### 1.3.12 long rotunlock_read(int degree, int range)
 1. degree와 range에 대한 값이 올바른지 체크한다.
 2. mutex_lock을 잡는다.
 3. find_node_and_del 함수를 통해 조건에 맞는 lock을 read_acquired list에서 찾는다.
@@ -141,4 +142,4 @@ unlock 함수가 call된 경우에 해당 degree, range, list (read 또는 write
 
 ## 3. Lesson learned
 * 수업때 배운 일반적인 lock과 다른 독특한 lock implementation 방식과, 그에 따른 write starvation 해법을 배우고 직접 kernel에 implement해보면서 많은 것을 배울 수 있었다.
-* 
+* 프로세스를 재우고 깨우는 구체적인 방법을 배울 수 있었다. 커널이 이를 어떠한 방식으로 수행하는지 알 수 있었다. wait_queue에 대해 알게 되었고, task의 state에 어떤 종류가 있고 이것이 나중에 어떤 역할을 하는지 알 수 있었고, scehdule()의 역할 중 일부를 알게 되었다. Linux Kenel Development 문서를 읽으면서 이를 알게 되었는데 커널 코드를 직접 하나하나 들여다보는 것 보다 훨씬 편했던 것 같다.
