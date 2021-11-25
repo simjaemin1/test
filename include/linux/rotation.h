@@ -17,7 +17,7 @@ typedef struct __rotlock_t__ {
 int get_lock(void);
 int check_range(int rotation, int degree, int range);
 void modify_waiting_cnt(int degree, int range, int type);
-rotlock_t* init_rotlock(int degree, int range, int rw_type);
+rotlock_t* init_rotlock(int degree, int range);
 int find_node_and_del(int degree, int range, struct list_head* head);
 void exit_rotlock(struct task_struct *p);
 void wait(void);
