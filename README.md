@@ -120,8 +120,19 @@ wait_entry를 만들고 이를 wait_queue 에 넣는다. 그리고 prepare_to_wa
 condition value를 1로 만들고 wake_up_procdss를 호출하여 프로세스를 깨운다.
 
 #### 1.3.9 long set_rotation(int degree)
+rotation degree의 값을 update하고 get_lock을 호출하여 바뀐 degree를 포함하며 조건이 맞는 lock을 가지고 있던 쓰레드를 깨운다.
 #### 1.3.10 long rotlock_read(int degree, int range)
+1. degree 값이 0부터 360사이의 값(360 미포함)인지 확인하고 range값이 0부터 180사이의 값인지 확인한다. 
+2. rotlock을 만들고 현재 degree가 해당 lock의 range에 있는지 확인하고 degree를 포함하는 range를 가진 write_lock이 기다리고 있는지 확인한다. write_acquired가 비었는지 확인하고 write_lock이 기다리고 있지 않으며 wrtie_acquired가 비었다면 lock을 hold하며 read_acquired에 해당 entry를 추가한다.
+3. 만약 조건이 하나라도 만족되지 않았다면 read_waiting에 해당 entry를 추가하고 wait를 호출하여 현재 쓰레드를 block시킨다. 쓰레드가 wake_up된 후에 lock 잡기에 앞서서 다른곳에서 조건이 바뀌어 다시 wait해야 될 경우를 대비하여 while문 안에서 wait함수가 실행되도록 한다. 
+4. 쓰레드가 wake_up되었다면 while문을 탈출하고 해당 rotlock entry를 waiting list에서 제거하고 acquired list에 넣는다.
+
 #### 1.3.11 long rotlock_write(int degree, int range)
+1. degree 값이 0부터 360사이의 값(360 미포함)인지 확인하고 range값이 0부터 180사이의 값인지 확인한다. 
+2. rotlock을 만들고 현재 degree가 해당 lock의 range에 있는지 확인하고 read_acquired, write_acquired가 비었는지 확인하고 w둘다 비었다면  lock을 hold하며 write_acquired에 해당 entry를 추가한다.
+3. 만약 조건이 하나라도 만족되지 않았다면 write_waiting에 해당 entry를 추가하고 해당하는 범위의 write_waiting_cnt의 값을 증가시킨 후 wait를 호출하여 현재 쓰레드를 block시킨다. 쓰레드가 wake_up된 후에 lock 잡기에 앞서서 다른곳에서 조건이 바뀌어 다시 wait해야 될 경우를 대비하여 while문 안에서 wait함수가 실행되도록 한다.
+4. 쓰레드가 wake_up 되었다면 while문을 탈출하고, 해당 범위의 write_waiting_cnt의 값을 감소시킨 후 해당 entry를 waiting list에서 제거하고 acquired list에 넣는다.
+
 #### 1.3.12 long rotunlock_read(int degree, int range)
 1. degree와 range에 대한 값이 올바른지 체크한다.
 2. mutex_lock을 잡는다.
@@ -139,6 +150,14 @@ condition value를 1로 만들고 wake_up_procdss를 호출하여 프로세스�
 6. mutex를 unlock하고 success를 return 한다.
 
 ## 2. Evaluation
+####2.1 rotd
+rotation degree의 값을 0부터 시작해서 2초마다 30씩 증가시키며 330이후는 다시 0으로 만든다.
+
+####2.2 selector
+integer의 값을 argument로 받고 이를 while문을 돌면서 1씩 증가시키고 integer파일에 쓴다. integer에 정상적으로 값을 작성하였다면 해당 값을 콘솔에 출력한다. test를 할 때에는 while문을 1초에 1번씩 돌도록 하였다.
+
+####2.3 trial
+identifier의 값을 argument로 받는다. while문을 돌면서 integer에 있는 숫자를 읽고 해당 숫자로 prime-factorization을 진행한다. 정상적으로 값을 읽고 prime=factorization을 진행하였다면 해당 결과를 콘솔에 출력한다. test를 할 때에는 while문을 1초에 1번씩 돌도록 하였다.
 
 ## 3. Lesson learned
 * 수업때 배운 일반적인 lock과 다른 독특한 lock implementation 방식과, 그에 따른 write starvation 해법을 배우고 직접 kernel에 implement해보면서 많은 것을 배울 수 있었다.
