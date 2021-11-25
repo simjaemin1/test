@@ -6,8 +6,11 @@ sudo mv boot.img modules.img ../tizen-image;
 sudo umount ../tizen-image/rootfs.img ../mnt_dir;
 sudo mount ../tizen-image/rootfs.img ../mnt_dir;
 cd test; arm-linux-gnueabi-gcc -I../include selector.c -o selector; cd ..;
-cd test; arm-linux-gnueabi-gcc -I../include trial.c -o trial1; cd ..;
-cd test; arm-linux-gnueabi-gcc -I../include trial.c -o trial2; cd ..;
+cd test; arm-linux-gnueabi-gcc -I../include trial.c -o trial; cd ..;
+cd test; arm-linux-gnueabi-gcc -I../include rotd.c -o rotd; cd ..;
 sudo cp test/selector ../mnt_dir/root;
-sudo cp test/trial1 ../mnt_dir/root;
-sudo cp test/trial2 ../mnt_dir/root;
+sudo cp test/trial ../mnt_dir/root;
+sudo cp test/rotd ../mnt_dir/root;
+cd ../mnt_dir;
+mount -o rw,remount ./dev/root ./
+#sudo sh qemu.sh
