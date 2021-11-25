@@ -5,14 +5,11 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 
-#define READ    0
-#define WRITE   1
-
 typedef struct __rotlock_t__ {
     pid_t pid;
     int degree;
     int range;
-    int rw_type; // Process is read or write type.
+    int cond;
     struct list_head node;
 } rotlock_t;
 

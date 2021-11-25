@@ -137,10 +137,10 @@ void exit_rotlock(struct task_struct *p) // Inject this function into do_exit() 
     }
     
     mutex_unlock(&rotlock_mutex);
-    printk(KERN_INFO "exit_rotlock successfully returned\n");
+    //printk(KERN_INFO "exit_rotlock successfully returned\n");
 }
 
-rotlock_t* init_rotlock(int degree, int range, int rw_type) 
+rotlock_t* init_rotlock(int degree, int range) 
 {
     rotlock_t* rotlock;
     rotlock = (rotlock_t *)kmalloc(sizeof(rotlock_t), GFP_KERNEL);
@@ -149,7 +149,7 @@ rotlock_t* init_rotlock(int degree, int range, int rw_type)
     rotlock->pid = current->pid;
     rotlock->degree = degree;
     rotlock->range = range;
-    rotlock->rw_type = rw_type;
+    rotlock->cond = 0;
     INIT_LIST_HEAD(&rotlock->node);
 
     return rotlock;
@@ -211,7 +211,7 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
         return -1;
     }
 
-    rotlock = init_rotlock(degree, range, READ);
+    rotlock = init_rotlock(degree, range);
 
     if(!rotlock) {
         printk(KERN_ERR "kmalloc failed\n");
@@ -259,7 +259,7 @@ SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
         return -1;
     }
 
-    rotlock = init_rotlock(degree, range, WRITE);
+    rotlock = init_rotlock(degree, range);
     
     if(!rotlock) {
         printk(KERN_ERR "kmalloc failed\n");
