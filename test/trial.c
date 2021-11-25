@@ -47,6 +47,7 @@ int main(int argc, char *argv[]){
 		prime_factor(num);
 		fclose(fp);
 		syscall(ROTUNLOCK_READ, 90, 90);
+        sleep(1);
 	}
 }
 

@@ -29,5 +29,6 @@ int main(int argc, char *argv[]){
 		fclose(fp);
 		printf("selector: %d\n", num++);
 		syscall(ROTUNLOCK_WRITE, 90, 90);
+        sleep(1);
 	}
 }
