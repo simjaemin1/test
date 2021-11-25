@@ -3,6 +3,21 @@
 
 ## 0. How to build kernel
 
+다음과 같은 directory 상황에서 tizen-5.0-rpi3 폴더를 kernel path라고 가정한다.
+또 정상적으로 qemu가 돌아가는 상황이라고 가정한다.
+```bash
+tizen-kernel
+├── tizen-5.0-rpi3
+├── tizen-image
+└── mnt_dir
+```
+```
+cd tizen-kernel/tizen-5.0-rpi3
+git pull origin proj3
+sudo sh coompile.sh
+sudo sh ./qume.sh
+
+
 ## 1. High Level Implementation
 ### 1.1 Systemcall implementation
 * include/linux/syscalls.h
@@ -55,8 +70,7 @@ rotation.h에는 rotlock_t을 정의하고 kernel/rotation.c에서 정의할  �
 
 * rotlock_t
 rotlock_t는 struct로 rotation lock에 필요한 변수들을 가지고 있다.  
-가장 필수적인 것으로 pid, degree, range와 read/write waiting/acquired list에 대한 struct list_head가 들어있다.   
-!!(rw_type은 필요 없는 것 같아서 추후에 삭제 예정.)!!
+가장 필수적인 것으로 pid, degree, range, condition variable 그리고 waiting/acquired list에 대한 struct list_head가 들어있다.   
 
 ### 1.3 kernel/rotation.c
 #### 1.3.1 static variable
@@ -73,12 +87,15 @@ rotation lock implementation에는 4개의 list가 필요하다. waiting하는 R
 4. mutex  
 list나 array, rotation 등에 대한 접근을 exclusive하고 atomic하게 진행하기 위해 mutex의 이용이 필수적이다. better concurrency와 throughput을  위해 다수의 mutex를 사용할 수도 있겠다고 생각했으나, 각 function이나 thread들이 mutex를 필요로 하는 범위가 애매하여 coding & debugging의 단순함을 위해 single mutex를 사용하였다.
 
+5. wait_queue
+1개 wait_queue가 필요하다. waiting하고 있는 process의 정보를 가지고 있는 waiting_entry를 wait_queue에 넣고 process를 wakeup하면 finish_wait를 호출하여 wait_queue에 있는 entry를 삭제한다.
+
 #### 1.3.2 int get_lock()
 get_lock() 함수는 두 R/W acquired list 모두 비어있는 경우에만 call된다.  
 1. mutex_lock을 먼저 잡는다.
-2. write starvation 방지를 위해 rotation에 맞는 write_lock에게 우선권을 주기 위해 먼저 write_waiting list를 돌며 node를 찾는다. 1개를 찾았다면 이를 write_waiting에서 제거하고 write_acquired로 넣는다. 이후 waiting_cnt에서 해당 range에서 cnt를 1만큼 내려준 후 wait중인 thread를 깨운다. 이후 loop을 break한다.
-3. range 내에 rotation을 둔 write lock이 없다면 read_waiting list를 traverse하며 조건에 맞는 모든 reader를 찾아 list를 옮겨준 후 깨운다. 한번에 multiple reading이 가능하므로 iteration을 loop 끝까지 전부 실행하며, 이를 위해 list_for_each_entry_safe를 이용한다.
-4. mutex unlock을 하고 loop iteration을 하며 acquire한 수를 cnt 한 후 이를 return한다.
+2. write starvation 방지를 위해 rotation에 맞는 write_lock에게 우선권을 주기 위해 먼저 write_waiting list를 돌며 node를 찾는다. 1개를 찾았다면 write_waiting_cnt에서 해당 range에서 cnt를 1만큼 내려준 후 wait중인 thread를 깨운다. 이후 loop을 break한다. list를 옮겨주는 작업은 write_lock에서 한다.
+3. range 내에 rotation을 둔 write lock이 없다면 read_waiting list를 traverse하며 조건에 맞는 모든 reader를 찾아 해당 thread를 깨운다. 한번에 multiple reading이 가능하므로 iteration을 loop 끝까지 전부 실행하며, 이를 위해 list_for_each_entry_safe를 이용한다.
+4. mutex unlock을 하고 loop iteration을 하며 깨운 쓰레드의 수를 cnt 한 후 이를 return한다.
 
 #### 1.3.3 int check_range(int rotation, int degree, int range)
 degree와 range에 대해 rotation이 포함되는지 체크하는 function이다. circular하게 정의되어있기 때문에 range의 low와 high가 0~359의 범위를 넘어간 경우 360에 대해 보정을 해준 후 계산한다.
@@ -97,6 +114,9 @@ acquired lock을 해제한 후 해당 list가 빈 경우 get_lock()으로 새로
 unlock 함수가 call된 경우에 해당 degree, range, list (read 또는 write)에 대한 acquired lock을 찾아 해제한다. 단 다른 process의 것을 해제하는 것을 방지하기 위해 pid를 체크한다. 같은 pid에 대해 여러 lock을 가지고 있다 하더라도 1개의 lock만 해제한다.
 
 ====> 수정 + 빈 경우에 get_lock하는것(unlock에서 알아서 부른다) 다른 함수에서도 (exit_rotlock등도 kfree 필요한듯?)
+#### 1.3.8 wait(rotlock_t *curr)
+#### 1.3.9 wakeup(rotlock_t *curr)
+
 
 #### 1.3.8 long set_rotation(int degree)
 #### 1.3.9 long rotlock_read(int degree, int range)
