@@ -150,13 +150,13 @@ rotation degree의 값을 update하고 get_lock을 호출하여 바뀐 degree를
 6. mutex를 unlock하고 success를 return 한다.
 
 ## 2. Evaluation
-####2.1 rotd
+#### 2.1 rotd
 rotation degree의 값을 0부터 시작해서 2초마다 30씩 증가시키며 330이후는 다시 0으로 만든다.
 
-####2.2 selector
+#### 2.2 selector
 integer의 값을 argument로 받고 이를 while문을 돌면서 1씩 증가시키고 integer파일에 쓴다. integer에 정상적으로 값을 작성하였다면 해당 값을 콘솔에 출력한다. test를 할 때에는 while문을 1초에 1번씩 돌도록 하였다.
 
-####2.3 trial
+#### 2.3 trial
 identifier의 값을 argument로 받는다. while문을 돌면서 integer에 있는 숫자를 읽고 해당 숫자로 prime-factorization을 진행한다. 정상적으로 값을 읽고 prime=factorization을 진행하였다면 해당 결과를 콘솔에 출력한다. test를 할 때에는 while문을 1초에 1번씩 돌도록 하였다.
 
 ## 3. Lesson learned
