@@ -35,7 +35,13 @@ int get_lock(void) {
     rotlock_t *next;
     int cnt = 0;
 
-    if(write_waiting_cnt[rotation] != 0) {
+    if(!list_empty(&write_acquired)) {
+        // Writer is using -> Don't need to try lock -> return
+        return 0;
+    }
+
+    if(write_waiting_cnt[rotation] != 0 && list_empty(&read_acquired)) {
+        // Try to get lock (writer) only if read_acquired is empty (readers are using)
         list_for_each_entry(curr, &write_waiting, node) {
             if(check_range(rotation, curr->degree, curr->range)) {
                 cnt++;
@@ -48,6 +54,7 @@ int get_lock(void) {
         }
     }
     else {
+        // Try to get new read waiting lock
         list_for_each_entry_safe(curr, next, &read_waiting, node) {
             if(check_range(rotation, curr->degree, curr->range)) {
                 cnt++;
@@ -322,6 +329,11 @@ SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 
     mutex_lock(&rotlock_mutex);
 
+    if(!list_empty(&write_acquired)) {
+        printk(KERN_ERR "Writer is using. No readers found.\n");
+        return -1;
+    }
+
     cnt = find_node_and_del(degree, range, &read_acquired);
     
     if(!cnt) {
@@ -353,6 +365,11 @@ SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
     }
 
     mutex_lock(&rotlock_mutex);
+
+    if(!list_empty(&read_acquired)) {
+        printk(KERN_ERR "Readers are using. No writer found.\n");
+        return -1;
+    }
 
     cnt = find_node_and_del(degree, range, &write_acquired);
 
