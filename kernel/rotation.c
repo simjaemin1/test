@@ -1,10 +1,9 @@
 #include <linux/rotation.h>
-#include <uapi/asm_generic/errno-base.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h> // kmalloc and kfree
 #include <linux/list.h> // kernel list API
-#include <mutex.h>
+#include <linux/mutex.h>
 
 #define INCREMENT 0
 #define DECREMENT 1
@@ -19,23 +18,31 @@ static LIST_HEAD(write_acquired);
 
 static DEFINE_MUTEX(rotlock_mutex);
 
-int get_lock() {
+void wait(void)
+{
+
+}
+
+void wakeup(void)
+{
+
+}
+
+int get_lock(void) {
     // This should be called when read_acquired and write_acquired are all empty.
     
     rotlock_t *curr;
     rotlock_t *next;
     int cnt = 0;
 
-    mutex_lock(&rotlock_mutex);
-
     if(write_waiting_cnt[rotation] != 0) {
         list_for_each_entry(curr, &write_waiting, node) {
             if(check_range(rotation, curr->degree, curr->range)) {
                 cnt++;
-                list_del(&curr->node, &write_waiting);
+                list_del(&curr->node);
                 list_add_tail(&curr->node, &write_acquired);
                 modify_waiting_cnt(curr->degree, curr->range, DECREMENT);
-                wake_up();
+                wakeup();
                 break;
             }
         }
@@ -44,13 +51,12 @@ int get_lock() {
         list_for_each_entry_safe(curr, next, &read_waiting, node) {
             if(check_range(rotation, curr->degree, curr->range)) {
                 cnt++;
-                list_del(&curr->node, &read_waiting);
+                list_del(&curr->node);
                 list_add_tail(&curr->node, &read_acquired);
-                wake_up();
+                wakeup();
             }
         }
     }
-    mutex_unlock(&rotlock_mutex);
 
     return cnt;
 }
@@ -63,24 +69,27 @@ int check_range(int rotation, int degree, int range)
         return (low+360<=rotation&&rotation<360)||(rotation<=high);
     if(high>=360)
         return (low<=rotation)||(rotation<=high-360);
-    return (low<=rotation)&&(rotation<=high);
 
+    return (low<=rotation)&&(rotation<=high);
 }
 
 void modify_waiting_cnt(int degree, int range, int type)
-{
-    int pos=degree-range;
-    if(pos<0)
-        pos+=360;
-    for(int i=0; i<=range*2; i++)
+{   int i;
+    int pos;
+    pos = degree - range;
+
+    if(pos < 0)
+        pos += 360;
+
+    for(i = 0; i <= range*2; i++)
     {
-        if(pos>=360)
-            pos-=360;
-        write_waiting_cnt[pos++]+=1-2*type;
+        if (pos >= 360)
+            pos -= 360;
+        write_waiting_cnt[pos++] += 1 - 2*type;
     }
 }
 
-void exit_rotlock(task_struct *p) // Inject this function into do_exit() in kernel/exit.c
+void exit_rotlock(struct task_struct *p) // Inject this function into do_exit() in kernel/exit.c
 {
     pid_t pid = p->pid;
     rotlock_t *curr;
@@ -104,7 +113,7 @@ void exit_rotlock(task_struct *p) // Inject this function into do_exit() in kern
     // Traverse read_acquired
     if(list_empty(&write_acquired)) {
         // list_empty(&write_acquired) means there are only reading rotlocks.
-        list_for_each_entry_safe(curr, next, &read_acquied, node) {
+        list_for_each_entry_safe(curr, next, &read_acquired, node) {
             if(curr->pid == pid) {
                 list_del(&curr->node);
             }
@@ -126,19 +135,20 @@ void exit_rotlock(task_struct *p) // Inject this function into do_exit() in kern
     }
     
     mutex_unlock(&rotlock_mutex);
+    //printk(KERN_INFO "exit_rotlock successfully returned\n");
 }
 
 rotlock_t* init_rotlock(int degree, int range, int rw_type) 
 {
     rotlock_t* rotlock;
-    rotlock = (rotlock_t *)kmalloc(sizeof(rotlock_t));
+    rotlock = (rotlock_t *)kmalloc(sizeof(rotlock_t), GFP_KERNEL);
     if(!rotlock)
         return NULL;
-    rotlock.pid = current->pid;
-    rotlock.degree = degree;
-    rotlock.range = range;
-    rotlock.rw_type = rw_type;
-    INIT_LIST_HEAD(&rotlock.node);
+    rotlock->pid = current->pid;
+    rotlock->degree = degree;
+    rotlock->range = range;
+    rotlock->rw_type = rw_type;
+    INIT_LIST_HEAD(&rotlock->node);
 
     return rotlock;
 }
@@ -188,7 +198,7 @@ SYSCALL_DEFINE1(set_rotation, int, degree)
             }
         }
     }
-    else if(list_empty(&write_acquired)) {
+    else if(list_empty(&read_acquired)) {
         // Writing
         curr = list_first_entry(&write_acquired, rotlock_t, node);
         if(!check_range(rotation, curr->degree, curr->range)) {
@@ -210,7 +220,6 @@ SYSCALL_DEFINE1(set_rotation, int, degree)
 SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 {
     rotlock_t *rotlock;
-    int cnt;
 
     if(degree < 0 || degree >= 360) {
         printk(KERN_ERR "degree should be 0 <= degree < 360\n");
@@ -234,7 +243,7 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 
     if(check_range(rotation, degree, range) 
             && write_waiting_cnt[rotation] == 0 && list_empty(&write_acquired)) {
-        list_add_tail(&rotlock->node, head);
+        list_add_tail(&rotlock->node, &read_acquired);
         mutex_unlock(&rotlock_mutex);
         return 0;
     }
@@ -257,23 +266,22 @@ SYSCALL_DEFINE2(rotlock_read, int, degree, int, range)
 SYSCALL_DEFINE2(rotlock_write, int, degree, int, range)
 {
     rotlock_t *rotlock;
-    int cnt;
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
-        return -EINVAL;
+        return -1;
     }
 
     if(range <= 0 || range >= 180) {
         printk(KERN_ERR "range should be 0 < range < 180\n");
-        return -EINVAL;
+        return -1;
     }
 
     rotlock = init_rotlock(degree, range, WRITE);
     
     if(!rotlock) {
         printk(KERN_ERR "kmalloc failed\n");
-        return -ENOMEM;
+        return -1;
     }
 
     mutex_lock(&rotlock_mutex);    
@@ -304,12 +312,12 @@ SYSCALL_DEFINE2(rotunlock_read, int, degree, int, range)
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
-        return -EINVAL;
+        return -1;
     }
 
     if(range <= 0 || range >= 180) {
         printk(KERN_ERR "range should be 0 < range < 180\n");
-        return -EINVAL;
+        return -1;
     }
 
     mutex_lock(&rotlock_mutex);
@@ -336,12 +344,12 @@ SYSCALL_DEFINE2(rotunlock_write, int, degree, int, range)
 
     if(degree < 0 || degree >= 360) {
   	    printk(KERN_ERR "degree should be 0 <= degree < 360\n");
-        return -EINVAL;
+        return -1;
     }
 
     if(range <= 0 || range >= 180) {
         printk(KERN_ERR "range should be 0 < range < 180\n");
-        return -EINVAL;
+        return -1;
     }
 
     mutex_lock(&rotlock_mutex);

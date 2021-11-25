@@ -68,7 +68,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
-extern void exit_rotlock(task_struct *p);
+#include <linux/rotation.h>
+//extern void exit_rotlock(task_struct *p);
 
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
