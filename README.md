@@ -159,6 +159,57 @@ integer의 값을 argument로 받고 이를 while문을 돌면서 1씩 증가시
 #### 2.3 trial
 identifier의 값을 argument로 받는다. while문을 돌면서 integer에 있는 숫자를 읽고 해당 숫자로 prime-factorization을 진행한다. 정상적으로 값을 읽고 prime=factorization을 진행하였다면 해당 결과를 콘솔에 출력한다. test를 할 때에는 while문을 1초에 1번씩 돌도록 하였다.
 
+#### 2.4 result
+1개의 selector와 2개의 trial을 background로 실행시키고 결과를 보았다.
+write starvation을 방지하는 policy때문에 selector가 계속해서 먼저 lock을 잡고, 이후에 두 reader가 동시에 lock을 잡아 결과를 출력하였다.
+selector와 trial 수를 늘린 경우에는 다른 selector가 lock waiting을 하고 있어 이때는 추가적인 reader들이 waiting에 모이게 되므로 모든 trial들이 결과를 출력하지는 않았다.  
+```
+root:~> ./rotd
+root:~> ./selector 7492 & ./trial 0 & ./trial 1 &
+[1] 570
+[2] 571
+[3] 572
+root:~> selector: 7492
+trial-0 : 7492 =  2*2*1873
+trial-1 : 7492 =  2*2*1873
+selector: 7493
+trial-1 : 7493 =  59*127
+trial-0 : 7493 =  59*127
+selector: 7494
+trial-1 : 7494 =  2*3*1249
+trial-0 : 7494 =  2*3*1249
+selector: 7495
+trial-1 : 7495 =  5*1499
+trial-0 : 7495 =  5*1499
+selector: 7496
+trial-0 : 7496 =  2*2*2*937
+trial-1 : 7496 =  2*2*2*937
+selector: 7497
+trial-0 : 7497 =  3*3*7*7*17
+trial-1 : 7497 =  3*3*7*7*17
+selector: 7498
+trial-1 : 7498 =  2*23*163
+trial-0 : 7498 =  2*23*163
+selector: 7499
+trial-0 : 7499 =  7499
+trial-1 : 7499 =  7499
+selector: 7500
+trial-0 : 7500 =  2*2*3*5*5*5*5
+trial-1 : 7500 =  2*2*3*5*5*5*5
+selector: 7501
+trial-0 : 7501 =  13*577
+trial-1 : 7501 =  13*577
+selector: 7502
+trial-0 : 7502 =  2*11*11*31
+trial-1 : 7502 =  2*11*11*31
+selector: 7503
+trial-0 : 7503 =  3*41*61
+trial-1 : 7503 =  3*41*61
+selector: 7504
+trial-1 : 7504 =  2*2*2*2*7*67
+trial-0 : 7504 =  2*2*2*2*7*67
+```
+
 ## 3. Lesson learned
 * 수업때 배운 일반적인 lock과 다른 독특한 lock implementation 방식과, 그에 따른 write starvation 해법을 배우고 직접 kernel에 implement해보면서 많은 것을 배울 수 있었다.
 * 프로세스를 재우고 깨우는 구체적인 방법을 배울 수 있었다. 커널이 이를 어떠한 방식으로 수행하는지 알 수 있었다. wait_queue에 대해 알게 되었고, task의 state에 어떤 종류가 있고 이것이 나중에 어떤 역할을 하는지 알 수 있었고, scehdule()의 역할 중 일부를 알게 되었다. Linux Kenel Development 문서를 읽으면서 이를 알게 되었는데 커널 코드를 직접 하나하나 들여다보는 것 보다 훨씬 편했던 것 같다.
