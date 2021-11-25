@@ -90,8 +90,7 @@ list나 array, rotation 등에 대한 접근을 exclusive하고 atomic하게 진
 5. wait_queue
 1개 wait_queue가 필요하다. waiting하고 있는 process의 정보를 가지고 있는 waiting_entry를 wait_queue에 넣고 process를 wakeup하면 finish_wait를 호출하여 wait_queue에 있는 entry를 삭제한다.
 
-#### 1.3.2 int get_lock()
-get_lock() 함수는 두 R/W acquired list 모두 비어있는 경우에만 call된다.  
+#### 1.3.2 int get_lock()  
 1. mutex_lock을 먼저 잡는다.
 2. write starvation 방지를 위해 rotation에 맞는 write_lock에게 우선권을 주기 위해 먼저 write_waiting list를 돌며 node를 찾는다. 1개를 찾았다면 write_waiting_cnt에서 해당 range에서 cnt를 1만큼 내려준 후 wait중인 thread를 깨운다. 이후 loop을 break한다. list를 옮겨주는 작업은 write_lock에서 한다.
 3. range 내에 rotation을 둔 write lock이 없다면 read_waiting list를 traverse하며 조건에 맞는 모든 reader를 찾아 해당 thread를 깨운다. 한번에 multiple reading이 가능하므로 iteration을 loop 끝까지 전부 실행하며, 이를 위해 list_for_each_entry_safe를 이용한다.
